@@ -1,5 +1,8 @@
-SyncRhythmboxLastFm - Sync Rhythmbox with Last.fm database
-==========================================================
+SyncRhythmboxLastFm
+===================
+Sync Rhythmbox with Last.fm database
+====================================
+
 Forked from LastfmPlaycount_
 
 .. _LastfmPlaycount: https://github.com/BramBonne/LastfmPlaycount
@@ -8,7 +11,7 @@ Forked from LastfmPlaycount_
 Synopsis
 --------
 
-The Last.fm database synchronization plugin for Rhythmbox fetches the currently playing track's playcount from Last.fm, and updates your Rhythmbox database accordingly.
+The Last.fm database synchronization plugin for Rhythmbox fetches the currently playing track's information from Last.fm, and updates your Rhythmbox database accordingly.
 
 Will be synchronized the following information:
 
@@ -16,21 +19,27 @@ Will be synchronized the following information:
 - Loved track (rating)
 - Date of first reproduction (first seen)
 - Date of last reproduction (last played)
-- *Suggestions_?*
+- *Suggestions_ ?*
 
 .. _Suggestions: https://github.com/phms/SyncRhythmboxLastFm/issues
 
-The Last.fm username is read from Rhythmbox' Last.fm plugin.
+
 
 
 Installation
 ------------
 
 To install the plugin for the current user only, run the install script with
-:: ./install.sh
+
+::
+
+  ./install.sh
 
 To install system-wide (for all users), run this script as root with
-:: sudo ./install.sh
+
+::
+
+  sudo ./install.sh
 
 
 How to enable
