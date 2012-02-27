@@ -1,4 +1,16 @@
+# SyncRhythmboxLastFm
+# -------------------
+# Sync Rhythmbox with Last.fm database
+# https://github.com/phms/SyncRhythmboxLastFm/
+#
+# by Fabio Serra
+# http://about.me/phms
+# 2012
+#
+#
+#
 # Original author: Bram Bonne
+# https://github.com/BramBonne/LastfmPlaycount
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,25 +34,27 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA.
 
-import rb
-
-import gi
-from gi.repository import GObject, Gtk, Gdk, GdkPixbuf, Gio, Peas, RB
+from gi.repository import GObject, Peas, RB
 
 from xml.dom import minidom
 from urllib import urlopen, urlencode
 
 from threading import Thread
-from time import sleep
+from time import sleep, mktime
+from datetime import datetime
 
-from lastfmplaycountconfig import Config
+from config import Config
+
+import locale
+locale.setlocale(locale.LC_ALL, 'en_US.utf8') # used to datetime.strptime
 
 LASTFM_API_KEY = "c1c872970090c90f65aed19c97519962"
 
-class LastfmPlaycountPlugin (GObject.GObject, Peas.Activatable):
-    __gtype_name__ = 'LastFmPlaycount'
+
+class SyncRhythmboxLastFm (GObject.GObject, Peas.Activatable):
+    __gtype_name__ = 'SyncRhythmboxLastFm'
     object = GObject.property(type=GObject.GObject)
-	
+
     def __init__ (self):
         GObject.GObject.__init__ (self)
 
@@ -56,7 +70,7 @@ class LastfmPlaycountPlugin (GObject.GObject, Peas.Activatable):
 
         sp = self.object.props.shell_player
         self.player_cb_ids = (
-	        sp.connect ('playing-song-changed', self.playing_entry_changed),
+            sp.connect ('playing-song-changed', self.playing_entry_changed),
         )
         self.playing_entry_changed (sp, sp.get_playing_entry ())
         print "Activation finished"
@@ -69,9 +83,9 @@ class LastfmPlaycountPlugin (GObject.GObject, Peas.Activatable):
         for id in self.player_cb_ids:
             sp.disconnect (id)
         self.player_cb_ids = ()
-        
+
         self._config.write()
-        
+
     def update_all(self):
         """
         Update the entire library in a separate thread.
@@ -80,7 +94,7 @@ class LastfmPlaycountPlugin (GObject.GObject, Peas.Activatable):
         """
         newthread = Thread(target=self._update_all_unthreaded, args=())
         newthread.start()
-    
+
     def _update_all_unthreaded (self):
         """
         Update the entire library.
@@ -96,7 +110,7 @@ class LastfmPlaycountPlugin (GObject.GObject, Peas.Activatable):
                 sleep(1)
             self._updating_all = False
             self.set_run_update_all(False)
-	
+
     def playing_entry_changed (self, sp, entry):
         """
         Callback function. Called whenever another song starts playing
@@ -119,32 +133,43 @@ class LastfmPlaycountPlugin (GObject.GObject, Peas.Activatable):
         """
         if entry is None:
             return
+            
+        # print dir(RB.RhythmDBPropType)
         artist = entry.get_string(RB.RhythmDBPropType.ARTIST)
         title = entry.get_string(RB.RhythmDBPropType.TITLE)
         try:
-            playcount, lovedtrack = self.get_lastfm_info(artist, title)
+            playcount, lovedtrack, firstseen, lastplayed = self.get_lastfm_info(artist, title)
+
+            if firstseen > 0:
+                old_firstseen = entry.get_ulong(RB.RhythmDBPropType.FIRST_SEEN)
+                if old_firstseen > firstseen:
+                    self.db.entry_set(entry, RB.RhythmDBPropType.FIRST_SEEN, firstseen)
+
+            if lastplayed > 0:
+                self.db.entry_set(entry, RB.RhythmDBPropType.LAST_PLAYED, lastplayed)
+
             if self._config.get_update_playcounts():
                 old_playcount = entry.get_ulong(RB.RhythmDBPropType.PLAY_COUNT)
                 if old_playcount < playcount:
-                    print "Setting playcount of \"%r - %r\" to %d" % (artist, title, playcount)
+                    print "\nSetting playcount of \"%r - %r\" to %d" % (artist, title, playcount)
                     self.db.entry_set(entry, RB.RhythmDBPropType.PLAY_COUNT, playcount)
                 elif old_playcount > playcount:
-                    print "Old playcount for \"%r - %r\" was higher than the new one (%d instead of %d). Not updating (assuming last.fm knows less)" % (artist, title, old_playcount, playcount)
+                    print "\nOld playcount for \"%r - %r\" was higher than the new one (%d instead of %d). Not updating (assuming last.fm knows less)" % (artist, title, old_playcount, playcount)
                 else:
-                    print "Playcount for \%r - \%r remained the same. Not updating" % (artist, title)
+                    print "\nPlaycount for \%r - \%r remained the same. Not updating" % (artist, title)
             if self._config.get_update_ratings() and lovedtrack:
-                print "Setting rating of \"%r - %r\" to 5 (loved track)" % (artist, title)
+                print "\nSetting rating of \"%r - %r\" to 5 (loved track)" % (artist, title)
                 self.db.entry_set(entry, RB.RhythmDBPropType.RATING, 5)
             self.db.commit()
         except IOError as (errno, strerror):
-            print "Could not update \"%r - %r\ (error (%r): %s)" % (artist, title, errno, strerror)
-        
+            print "\nCould not update \"%r - %r\ (error (%r): %s)" % (artist, title, errno, strerror)
+
     def get_lastfm_info(self, artist, title):
         """
         Invokes Last.fm's API to get the playcount for the provided song
         @artist The artist of the song
         @title  The title of the song
-        @return The playcount, and whether or not the track is loved
+        @return The playcount, firstseen, lastplayed, and whether or not the track is loved
         """
         params = urlencode({'method':'track.getinfo', 'api_key':LASTFM_API_KEY,
             'artist':artist, 'track':title, 'username':self._config.get_username(), 'autocorrect':1})
@@ -159,4 +184,35 @@ class LastfmPlaycountPlugin (GObject.GObject, Peas.Activatable):
             lovedtrack = bool(int(lovedtrack))
         except:
             lovedtrack = False
-        return (playcount,lovedtrack)
+        try:
+            # from: <url>http://www.last.fm/music/Rage/_/Frozen+Fire</url>
+            # to: http://www.last.fm/user/fabio-phms/library/music/Rage/_/Frozen+Fire
+            url = (response.getElementsByTagName("url")[0].childNodes[0].data).replace("/music/", "/user/" + self._config.get_username() + "/library/music/")
+            print "\nLast.fm page: %s" % (url)
+
+            # Ugly Hack to get play dates, since this information is not available in the API.
+            # The closest thing I found was this http://www.lastfm.com.br/api/show/user.getArtistTracks, but this is not enough.
+            table = urlopen(url).read()
+            table_ini = table.find("<table id=\"libraryList\"")
+            table_end = table.find("</table>", table_ini) + 8
+            table = table[table_ini:table_end]
+            response = minidom.parseString(table)
+
+            date = response.getElementsByTagName("td")
+            firstseen = (date[date.length - 1].childNodes[0].data).strip()
+            lastplayed = (date[7].childNodes[0].data).strip()
+            print "\nSetting first seen of \"%r - %r\" to %s" % (artist, title, firstseen)
+            print "\nSetting last played of \"%r - %r\" to %s" % (artist, title, lastplayed)
+
+            # "17 Aug 2007, 20:43" to UNIX timestamp
+            firstseen = mktime(datetime.strptime(firstseen, "%d %b %Y, %H:%M").timetuple())
+            lastplayed = mktime(datetime.strptime(lastplayed, "%d %b %Y, %H:%M").timetuple())
+        except:
+            lastplayed = 0
+            firstseen = 0
+        
+        #TODO:
+        # http://www.lastfm.com.br/api/show/track.getCorrection
+        # http://www.lastfm.com.br/api/show/track.getTopTags
+
+        return (playcount, lovedtrack, firstseen, lastplayed)

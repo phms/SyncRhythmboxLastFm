@@ -1,7 +1,6 @@
 SyncRhythmboxLastFm
 ===================
-Sync Rhythmbox with Last.fm database
-====================================
+**Synchronize Rhythmbox with the Last.fm database**
 
 Forked from LastfmPlaycount_
 
@@ -19,7 +18,7 @@ Will be synchronized the following information:
 - Loved track (rating)
 - Date of first reproduction (first seen)
 - Date of last reproduction (last played)
-- *Suggestions_ ?*
+- Suggestions_ ?
 
 .. _Suggestions: https://github.com/phms/SyncRhythmboxLastFm/issues
 
@@ -45,7 +44,7 @@ To install system-wide (for all users), run this script as root with
 How to enable
 -------------
 
-After installing the plugin in one of the two ways mentioned above, start up Rhythmbox, and head over to the "Edit > Plugins" menu. Check the box next to "Last.fm playcount synchronization".
+After installing the plugin in one of the two ways mentioned above, start up Rhythmbox, and head over to the "**Edit > Plugins**" menu. Check the box next to "**Sync Rhythmbox Last.Fm**".
 Also make sure that you also have the regular "Last.fm" plugin enabled, since your Last.fm credentials stored in this plugin are used by the Last.fm playcount synchronization plugin to get the correct playcounts.
 
 
@@ -66,3 +65,4 @@ Credits
 -------
 
 Plugin created by Bram Bonné (https://github.com/BramBonne) and forked by Fabio Serra (https://github.com/phms)
+

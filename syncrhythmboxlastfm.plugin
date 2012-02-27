@@ -1,0 +1,9 @@
+[Plugin]
+Loader=python
+Module=syncrhythmboxlastfm
+IAge=1
+Depends=rb
+Name=Sync Rhythmbox Last.Fm
+Description=Synchronize Rhythmbox with the Last.fm database
+Authors=Fabio Serra
+Website=https://github.com/phms/SyncRhythmboxLastFm
